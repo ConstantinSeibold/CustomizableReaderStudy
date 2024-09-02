@@ -1,0 +1,5 @@
+streamlit
+pyyaml
+pydicom
+pandas
+streamlit_authenticator
