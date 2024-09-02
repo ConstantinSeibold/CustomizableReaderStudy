@@ -1,57 +1,88 @@
-import streamlit as st
-import sys
 import os
-import argparse
 from pathlib import Path
 from glob import glob
+
+import streamlit as st
 import pydicom
 import numpy as np
 import pandas as pd
 from PIL import Image
-from io import BytesIO
 import yaml
 import streamlit_authenticator as stauth
 from hash_password import hide_users
 
-# Load the users.yml and selects.yml files from environment variables
-users_yml_path = os.getenv('USERS_YML', 'Users.yml')
-selects_yml_path = os.getenv('SELECTS_YML', 'select.yml')
+
+# Load the paths to the users.yml and selects.yml configuration files from environment variables.
+# Defaults are provided in case the environment variables are not set.
+users_yml_path: str = os.getenv('USERS_YML', 'Users.yml')
+selects_yml_path: str = os.getenv('SELECTS_YML', 'select.yml')
 
 # users_yml_path = 'Users.yml'
 # selects_yml_path =  'select.yml'
 # file_path = 'study_samples'
 
-def apply_window_level(dicom_array, window_width, window_level):
-    """Apply window level to the DICOM image array."""
-    lower_bound = window_level - (window_width / 2)
-    upper_bound = window_level + (window_width / 2)
+def apply_window_level(dicom_array: np.ndarray, window_width: float, window_level: float) -> np.ndarray:
+    """Applies window leveling to a DICOM image array.
+
+    Args:
+        dicom_array (np.ndarray): The DICOM image pixel array.
+        window_width (float): The width of the window.
+        window_level (float): The level of the window.
+
+    Returns:
+        np.ndarray: The window-leveled image array as an 8-bit unsigned integer.
+    """
+    lower_bound: float = window_level - (window_width / 2)
+    upper_bound: float = window_level + (window_width / 2)
     
+    # Clip and scale the pixel array to the [0, 255] range.
     dicom_array = np.clip(dicom_array, lower_bound, upper_bound)
-    dicom_array = (dicom_array - lower_bound) / (upper_bound - lower_bound) * 255.0
+    dicom_array = ((dicom_array - lower_bound) / (upper_bound - lower_bound)) * 255.0
     return dicom_array.astype(np.uint8)
 
-def load_dicom_image(dicom_path):
-    """Load a DICOM file and return the pixel array, window width, and window level."""
+
+def load_dicom_image(dicom_path: str) -> tuple[np.ndarray, float, float]:
+    """Loads a DICOM file and extracts the pixel array along with window width and level.
+
+    Args:
+        dicom_path (str): Path to the DICOM file.
+
+    Returns:
+        tuple: A tuple containing the DICOM image array, window width, and window level.
+    """
     dicom = pydicom.dcmread(dicom_path)
     dicom_array = dicom.pixel_array
-    window_width = dicom.WindowWidth if 'WindowWidth' in dicom else dicom_array.max() - dicom_array.min()
-    window_level = dicom.WindowLevel if 'WindowLevel' in dicom else (dicom_array.max() + dicom_array.min()) / 2
+    window_width: float = dicom.WindowWidth if 'WindowWidth' in dicom else dicom_array.max() - dicom_array.min()
+    window_level: float = dicom.WindowLevel if 'WindowLevel' in dicom else (dicom_array.max() + dicom_array.min()) / 2
     return dicom_array, window_width, window_level
 
 
-def convert_df(dataframe: pd.DataFrame):
+def convert_df(dataframe: pd.DataFrame) -> bytes:
+    """Converts a DataFrame to a CSV byte string.
+
+    Args:
+        dataframe (pd.DataFrame): The DataFrame to convert.
+
+    Returns:
+        bytes: The CSV data encoded as UTF-8 bytes.
+    """
     return dataframe.to_csv(index=False).encode('utf-8')
 
+def save_annotations(csv_path: str, annotations: list[dict]) -> None:
+    """Saves annotations to a CSV file, updating existing entries if present.
 
-def save_annotations(csv_path, annotations):
-    """Save annotations to a CSV file."""
+    Args:
+        csv_path (str): Path to the CSV file.
+        annotations (list[dict]): List of annotation dictionaries to save.
+    """
+    df = pd.DataFrame(annotations)
 
     if not os.path.isfile(csv_path):
-        df = pd.DataFrame(annotations)
+        # Create new CSV if it doesn't exist.
         df.to_csv(csv_path, index=False)
     else:
+        # Update existing annotations.
         orig_df = pd.read_csv(csv_path)*1
-        df = pd.DataFrame(annotations)
 
         orig_df.loc[orig_df.ID.isin(df.ID.astype(int)),df.keys()] = df[df.ID.isin(orig_df.ID.astype(int))]*1
 
@@ -59,33 +90,49 @@ def save_annotations(csv_path, annotations):
 
         
 
-def write_csv(csv_path, selects, ids):
+def write_csv(csv_path: Path, selects: dict, ids: list[int]) -> None:
+    """Writes the initial CSV structure for annotations.
+
+    Args:
+        csv_path (Path): Path to save the CSV file.
+        selects (dict): Dictionary of selections for annotations.
+        ids (list[int]): List of IDs to include in the CSV.
+    """
     if not os.path.isfile(csv_path):
         os.makedirs(csv_path.parent, exist_ok=True)
         with open(str(csv_path), 'w+') as results_file:
-            string = 'ID, annotated,text_comment,'.replace(
+            header = 'ID, annotated,text_comment,'.replace(
                                    " ",""
                                ) + ",".join([
                                    ",".join([f"{elem},certainty_{elem}" for elem in selects[key]])
                                    for key in selects.keys()
                                    ]) + "\n"
-            results_file.write(string)
+            results_file.write(header)
 
-            elementstring = ",".join([
+            row_template = ",".join([
                                    ",".join(["," for elem in selects[key]])
                                    for key in selects.keys()
                                    ])
-            
             for id in ids:
-                results_file.writelines(f'{id},{0},{elementstring}\n')
+                results_file.writelines(f'{id},{0},{row_template}\n')
+                
 
-def main(file_path: str, file_type: str, study_type: str):
+def main(file_path: str, file_type: str, study_type: str) -> None:
+    """Main application logic.
 
-    print(os.path.isfile(users_yml_path))
-    print(os.path.isfile(selects_yml_path))
+    Args:
+        file_path (str): Path to the study files.
+        file_type (str): Type of the file (e.g., 'dcm').
+        study_type (str): Type of study (e.g., 'original').
+    """
+    # Check existence of the configuration files.
+    if not (os.path.isfile(users_yml_path) and os.path.isfile(selects_yml_path)):
+        st.error("Configuration files are missing.")
+        return
 
+    # Hide user credentials from the environment.
     hide_users()
-
+    
     # Load the users.yml file
     with open(users_yml_path, 'r') as file:
         config = yaml.safe_load(file)
@@ -94,10 +141,8 @@ def main(file_path: str, file_type: str, study_type: str):
     with open(selects_yml_path, 'r') as file:
         selections = yaml.safe_load(file)
 
-    # Get user credentials from the config file
+    # Get user credentials from the config file and set up the authenticator
     credentials = config['credentials']
-    
-    # Set up the authenticator
     authenticator = stauth.Authenticate(
         config['credentials'],
         config['cookie']['name'],
@@ -251,9 +296,8 @@ def main(file_path: str, file_type: str, study_type: str):
 
 
 if __name__ == "__main__":
-    file_path = os.getenv('FILE_PATH', '')
-
-    mode = os.getenv("STUDY_MODE", "original")
+    file_path: str = os.getenv('FILE_PATH', '')
+    mode: str = os.getenv("STUDY_MODE", "original")
 
     if not file_path:
         st.error("FILE_PATH environment variable must be set.")
