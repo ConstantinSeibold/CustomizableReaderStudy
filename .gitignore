@@ -1,6 +1,6 @@
-.dcm
-.png
-.csv
-.yml
-.pyc
+*.dcm
+*.png
+*.csv
+*.yml
+*.pyc
 __pycache__

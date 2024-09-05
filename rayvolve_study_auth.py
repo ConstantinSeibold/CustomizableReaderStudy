@@ -12,10 +12,56 @@ import streamlit_authenticator as stauth
 from hash_password import hide_users
 
 
+
 # Load the paths to the users.yml and selects.yml configuration files from environment variables.
 # Defaults are provided in case the environment variables are not set.
 users_yml_path: str = os.getenv('USERS_YML', 'Users.yml')
 selects_yml_path: str = os.getenv('SELECTS_YML', 'select.yml')
+descriptor_yml_path: str = os.getenv('DESCRIPTOR_YML', 'descriptor.yml')
+
+file_path: str = os.getenv('FILE_PATH', '')
+mode: str = os.getenv("STUDY_MODE", "original")
+file_type: str = os.getenv("FILE_TYPE", "dcm")
+
+# Check existence of the configuration files.
+if not (os.path.isfile(users_yml_path) and \
+        os.path.isfile(selects_yml_path) and\
+        os.path.isfile(descriptor_yml_path)):
+    st.error("Configuration files are missing.")
+
+# Hide user credentials from the environment.
+hide_users()
+
+# Load the users.yml file
+with open(users_yml_path, 'r') as file:
+    config = yaml.safe_load(file)
+
+# Load the select.yml file
+with open(selects_yml_path, 'r') as file:
+    selections = yaml.safe_load(file)
+
+# Load the select.yml file
+with open(descriptor_yml_path, 'r') as file:
+    descriptor_yml = yaml.safe_load(file)
+
+ray_ids = glob(str(Path(file_path) / '*'))
+        
+ray_ids = sorted(list({
+    int(Path(file).stem.split("_")[0][3:]) for file in ray_ids
+}))
+
+prefix = descriptor_yml["study_prefix"]
+
+all_files = {
+            index: sum(
+                    [
+                        glob(str(Path(file_path) / f"{prefix}{index:03}" / f'*_{st}.{file_type}')) 
+                        for st in mode.split("|")
+                    ], 
+                    []
+                    )
+            for index in ray_ids 
+        }
 
 # users_yml_path = 'Users.yml'
 # selects_yml_path =  'select.yml'
@@ -82,9 +128,13 @@ def save_annotations(csv_path: str, annotations: list[dict]) -> None:
         df.to_csv(csv_path, index=False)
     else:
         # Update existing annotations.
-        orig_df = pd.read_csv(csv_path)*1
+        orig_df = pd.read_csv(csv_path)
 
-        orig_df.loc[orig_df.ID.isin(df.ID.astype(int)),df.keys()] = df[df.ID.isin(orig_df.ID.astype(int))]*1
+        keys = list(set(df.keys())-{"ID"})
+        indices = orig_df.ID.astype(int)==df.iloc[0].ID.astype(int)
+        
+        orig_df.loc[indices,keys] = df.loc[[0],keys].values
+        # orig_df.loc[orig_df.ID.astype(int)==df.iloc[0].ID.astype(int),df.keys()] = df.iloc[0]
 
         orig_df.to_csv(csv_path, index=False)
 
@@ -109,15 +159,15 @@ def write_csv(csv_path: Path, selects: dict, ids: list[int]) -> None:
                                    ]) + "\n"
             results_file.write(header)
 
-            row_template = ",".join([
-                                   ",".join(["," for elem in selects[key]])
+            row_template = "Nothing,"+",".join([
+                                   ",".join(["False,-1" for elem in selects[key]])
                                    for key in selects.keys()
                                    ])
             for id in ids:
-                results_file.writelines(f'{id},{0},{row_template}\n')
+                results_file.writelines(f'{id},{False},{row_template}\n')
                 
 
-def main(file_path: str, file_type: str, study_type: str) -> None:
+def main() -> None:
     """Main application logic.
 
     Args:
@@ -125,22 +175,7 @@ def main(file_path: str, file_type: str, study_type: str) -> None:
         file_type (str): Type of the file (e.g., 'dcm').
         study_type (str): Type of study (e.g., 'original').
     """
-    # Check existence of the configuration files.
-    if not (os.path.isfile(users_yml_path) and os.path.isfile(selects_yml_path)):
-        st.error("Configuration files are missing.")
-        return
-
-    # Hide user credentials from the environment.
-    hide_users()
     
-    # Load the users.yml file
-    with open(users_yml_path, 'r') as file:
-        config = yaml.safe_load(file)
-
-    # Load the select.yml file
-    with open(selects_yml_path, 'r') as file:
-        selections = yaml.safe_load(file)
-
     # Get user credentials from the config file and set up the authenticator
     credentials = config['credentials']
     authenticator = stauth.Authenticate(
@@ -152,7 +187,12 @@ def main(file_path: str, file_type: str, study_type: str) -> None:
     )
 
     # Create login widget
-    name, authentication_status, username = authenticator.login('main', fields = {'Form name': 'Rayvolve Study Login'})
+    name, authentication_status, username = authenticator.login('main', fields = {
+        'Form name': descriptor_yml["login"]["study_name"],
+        'Username': descriptor_yml["login"]["username"], 
+        'Password': descriptor_yml["login"]["password"], 
+        'Login': descriptor_yml["login"]["login"]
+        })
 
 
     # If authentication is successful, run the main app
@@ -163,27 +203,20 @@ def main(file_path: str, file_type: str, study_type: str) -> None:
 
         # Set up the logout button
         if st.session_state.get("authentication_status"):
-            authenticator.logout('Logout', 'sidebar')
+            authenticator.logout(descriptor_yml["login"]["logout"], 'sidebar')
         
-        current_file_path = "results"
+        current_file_path = "results"   
         
-        # Get a list of all files in the main file
-
-        ray_ids = glob(str(Path(file_path) / '*'))
-        
-        ray_ids = sorted(list({
-            int(Path(file).stem.split("_")[0][3:]) for file in ray_ids
-        }))
-
         ray_ids = [index for index in ray_ids if (start_id<=index and end_id>=index) ] 
 
+        # Get a list of all files in the main file
+        
         files = {
-            index: glob(str(Path(file_path) / f"RAY{index:03}" / f'*_{study_type}.{file_type}'))
-            for index in ray_ids
+            index: all_files[index]
+            for index in ray_ids 
         }
-
+        
         csv_path = Path(__file__).parent / 'results' / f'{username}-results.csv'
-
 
         write_csv(csv_path, selections, ray_ids)
 
@@ -220,14 +253,21 @@ def main(file_path: str, file_type: str, study_type: str) -> None:
             # Display navigation buttons
             col1, col2 = st.columns([1, 1])
             with col1:
-                st.button("Previous", on_click=prev_file)
+                st.button(descriptor_yml["selection"]["previous"], on_click=prev_file)
             with col2:
-                st.button("Next", on_click=next_file)
+                st.button(descriptor_yml["selection"]["next"], on_click=next_file)
 
             progress_bar = st.progress(int(((df.annotated.sum() / len(files))) * 100),
                                     text=f'{int(((df.annotated.sum() / len(files))) * 100)} %')
 
-            st.header(f"file: {st.session_state.file_index + 1}/{len(files)}")
+            
+            with st.expander(descriptor_yml["task"]["task_name"], expanded=True):
+                info_md = descriptor_yml["task"]["task_caption"]
+                st.markdown(info_md, unsafe_allow_html=True)
+                
+            st.header(descriptor_yml["case"] + f" {st.session_state.file_index + 1}/{len(files)}")
+
+            
 
             # Get the current file name
             current_files = files[ray_ids[st.session_state.file_index]]
@@ -244,28 +284,41 @@ def main(file_path: str, file_type: str, study_type: str) -> None:
                     dicom_array, default_window_width, default_window_level = load_dicom_image(dicom_path)
 
                     # Create sliders for window width and window level
-                    window_width = st.slider(f"Window Width_{i}", min_value=1, max_value=int(dicom_array.max()), value=int(default_window_width))
-                    window_level = st.slider(f"Window Level_{i}", min_value=int(dicom_array.min()), max_value=int(dicom_array.max()), value=int(default_window_level))
+                    window_width = st.slider(f"Window Width_{i}", 
+                                            min_value=1, 
+                                            max_value=int(dicom_array.max()), 
+                                            value=int(default_window_width)
+                                            )
+                    window_level = st.slider(f"Window Level_{i}", 
+                                            min_value=int(dicom_array.min()),
+                                            max_value=int(dicom_array.max()),
+                                            value=int(default_window_level)
+                                            )
 
                     # Apply window/level and display the image
                     dicom_array = apply_window_level(dicom_array, window_width, window_level)
                     image = Image.fromarray(dicom_array)
                     st.image(image, use_column_width=True)
 
-            category = Path(current_files[0]).stem.split("_")[1]
-
-            with st.expander("### Aufgabenerklaerung:", expanded=True):
-                st.header(" Bitte klicken Sie alles an was zutrifft. \n ### Daraufhin erscheint ein Slider. Geben Sie bitte durch diesen Slider an, wie sicher Sie sich dabei sind. \n ### Nachdem Sie Ihre Bewertung angegeben haben, klicken Sie bitte auf 'Submit'.")
+            category = Path(current_files[0]).stem.split("_")[1]            
 
             conditions = {}
             for subselects in selections[category]:
-                conditions[subselects] = st.checkbox(f"{subselects}", key=f"checkbox_{subselects}")
+                conditions[subselects] = st.checkbox(
+                                                     f"{subselects}", 
+                                                     key=f"checkbox_{subselects}", 
+                                                     value=False
+                                                     )
                 if conditions[subselects]:
                     # Slider to indicate certainty level
-                    conditions["certainty_"+subselects] = st.slider(f"Certainty Level", min_value=1, max_value=5, value=3, key=f"slider_{subselects}")
+                    conditions["certainty_"+subselects] = st.slider(descriptor_yml["certainty"]["certainty_caption"], 
+                                                                    min_value=descriptor_yml["certainty"]["min_certainty"], 
+                                                                    max_value=descriptor_yml["certainty"]["max_certainty"], 
+                                                                    value=(descriptor_yml["certainty"]["min_certainty"]+descriptor_yml["certainty"]["max_certainty"])//2, 
+                                                                    key=f"slider_{subselects}")
 
 
-            text_comment = st.text_input("Kommentarfeld:", )
+            text_comment = st.text_input(descriptor_yml["comments"], )
 
             # Store the annotation
             annotations = [{
@@ -274,32 +327,30 @@ def main(file_path: str, file_type: str, study_type: str) -> None:
                 "annotated": True
             } | conditions]
 
-            enter_results = st.button("Submit")
+            enter_results = st.button(descriptor_yml["submit"])
+
+            st.write(st.session_state)
 
             if enter_results:
                 save_annotations(csv_path, annotations)
                 next_file()
+                # https://docs.streamlit.io/develop/api-reference/caching-and-state/st.session_state
                 st.rerun()
 
         with open(csv_path, "rb") as f:
             st.download_button(
-                label="Download Annotations CSV",
+                label=descriptor_yml["download"],
                 data=f,
                 file_name=f"{username}-results.csv",
                 mime="text/csv"
             )
 
     elif authentication_status == False:
-        st.error('Username/password is incorrect')
+        st.error(descriptor_yml["login"]["error"])
     elif authentication_status == None:
-        st.warning('Please enter your username and password')
+        st.warning(descriptor_yml["login"]["warning"])
 
 
 if __name__ == "__main__":
-    file_path: str = os.getenv('FILE_PATH', '')
-    mode: str = os.getenv("STUDY_MODE", "original")
 
-    if not file_path:
-        st.error("FILE_PATH environment variable must be set.")
-    else:
-        main(file_path, "dcm", mode)
+    main()
