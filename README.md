@@ -56,29 +56,35 @@ docker build -t rayvolve .
 Run the Docker container via Dockerhub:
 
 ```bash
-docker run -d -p 8501:8501 \
+docker run -d -p 8501:8501 \                                                                
   -v /path/to/your/Users.yml:/app/Users.yml \
   -v /path/to/your/select.yml:/app/select.yml \
   -v /path/to/your/study_samples:/app/study_samples \
+  -v /path/to/your/descriptor.yml:/app/descriptor.yml \
   -e USERS_YML=/app/Users.yml \
   -e SELECTS_YML=/app/select.yml \
+  -e DESCRIPTOR_YML=/app/descriptor.yml \
+  -e FILE_TYPE=dcm \
   -e FILE_PATH=/app/study_samples \
   -e STUDY_MODE=rayvolve \
-  cseibold/rayvolve:init
+  cseibold/rayvolve:0.2
 ```
 
 Example Command:
 
 ```bash
-docker run -d -p 8501:8501 \
+docker run -d -p 8501:8501 \                                                                
   -v /Users/constantinseibold/workspace/rayvolve/Users.yml:/app/Users.yml \
   -v /Users/constantinseibold/workspace/rayvolve/select.yml:/app/select.yml \
-  -v /Users/constantinseibold/workspace/rayvolve/rayvolve_study_samples/:/app/study_samples \
+  -v /Users/constantinseibold//workspace/study_samples/:/app/study_samples \
+  -v /Users/constantinseibold/workspace/rayvolve/descriptor.yml:/app/descriptor.yml \
   -e USERS_YML=/app/Users.yml \
   -e SELECTS_YML=/app/select.yml \
+  -e DESCRIPTOR_YML=/app/descriptor.yml \
+  -e FILE_TYPE=dcm \
   -e FILE_PATH=/app/study_samples \
   -e STUDY_MODE=rayvolve \
-  cseibold/rayvolve:init
+  cseibold/rayvolve:0.2
 ```
 
 ### Configuration Files
@@ -112,6 +118,39 @@ Case_Type:
   - Option 1
   - Option 2
   - Option 3
+```
+
+#### descriptor.yml
+
+```yml
+study_prefix: "RAY"
+login:
+  study_name: "Rayvolve - Nutzerstudie"
+  username: "Nutzername"
+  password: "Password"
+  login: "Login"
+  logout: "Logout"
+  error: "Username/password is incorrect"
+  warning: "Please enter your username and password"
+task: 
+  task_name: "Aufgabenstellung" 
+  task_caption: |
+    ### Bitte klicken Sie alles an was zutrifft.
+    ### Daraufhin erscheint ein Slider. Geben Sie bitte durch diesen Slider an, wie sicher Sie sich dabei sind.
+    ### Nachdem Sie Ihre Bewertung angegeben haben, klicken Sie bitte auf 'Submit'.
+case: "Case"
+selection:
+  previous: "Previous"
+  next: "Next"
+  missing: "Missing:"
+  max_missing: 10
+certainty: 
+  min_certainty: 1
+  max_certainty: 5 
+  certainty_caption: "Sicherheit: 1 (sehr unsicher) - 5 (sehr sicher) "
+comments: "Kommentarfeld"
+submit: "Abschicken"
+download: "Download Annotation CSV"
 ```
 
 ## Docker Installation Guide
