@@ -3,4 +3,5 @@
 *.csv
 *.yml
 *.pyc
+*.json
 __pycache__
