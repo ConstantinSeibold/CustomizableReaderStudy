@@ -14,6 +14,7 @@ import yaml
 import streamlit_authenticator as stauth
 from hash_password import hide_users
 
+st.set_page_config(layout="wide")
 
 # Load the paths to the users.yml and selects.yml configuration files from environment variables.
 # Defaults are provided in case the environment variables are not set.
