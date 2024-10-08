@@ -6,6 +6,7 @@ WORKDIR /app
 COPY requirements.txt /app/
 COPY hash_password.py /app/
 COPY rayvolve_study_auth.py /app/
+COPY pages/ /app/pages
 COPY Dockerfile /app/
 
 RUN apt update && apt install -y libgl1-mesa-glx

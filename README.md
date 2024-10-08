@@ -56,10 +56,10 @@ docker build -t rayvolve .
 Run the Docker container via Dockerhub:
 
 ```bash
-docker run -d -p 8501:8501 \                                                                
+docker run -d -p 8501:8501 \
   -v /path/to/your/Users.yml:/app/Users.yml \
   -v /path/to/your/select.yml:/app/select.yml \
-  -v /path/to/your/study_samples:/app/study_samples \
+  -v /Users/constantinseibold/Downloads/OneDrive_1_10-8-2024/:/app/study_samples \
   -v /path/to/your/descriptor.yml:/app/descriptor.yml \
   -e USERS_YML=/app/Users.yml \
   -e SELECTS_YML=/app/select.yml \
@@ -67,16 +67,17 @@ docker run -d -p 8501:8501 \
   -e FILE_TYPE=dcm \
   -e FILE_PATH=/app/study_samples \
   -e STUDY_MODE=rayvolve \
-  cseibold/rayvolve:0.2
+  -e RUN_MODE=debug \
+  cseibold/rayvolve:0.4
 ```
 
 Example Command:
 
 ```bash
-docker run -d -p 8501:8501 \                                                                
+docker run -d -p 8501:8501 \
   -v /Users/constantinseibold/workspace/rayvolve/Users.yml:/app/Users.yml \
   -v /Users/constantinseibold/workspace/rayvolve/select.yml:/app/select.yml \
-  -v /Users/constantinseibold//workspace/study_samples/:/app/study_samples \
+  -v /Users/constantinseibold/Downloads/OneDrive_1_10-8-2024/:/app/study_samples \
   -v /Users/constantinseibold/workspace/rayvolve/descriptor.yml:/app/descriptor.yml \
   -e USERS_YML=/app/Users.yml \
   -e SELECTS_YML=/app/select.yml \
@@ -84,7 +85,8 @@ docker run -d -p 8501:8501 \
   -e FILE_TYPE=dcm \
   -e FILE_PATH=/app/study_samples \
   -e STUDY_MODE=rayvolve \
-  cseibold/rayvolve:0.2
+  -e RUN_MODE=debug \
+  cseibold/rayvolve:amd64
 ```
 
 ### Configuration Files
