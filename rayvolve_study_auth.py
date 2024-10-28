@@ -17,6 +17,7 @@ st.set_page_config(layout="wide")
 
 # Environment variable fallbacks
 users_yml_path: str = os.getenv('USERS_YML', 'Users.yml')
+assignment_csv_path: str = os.getenv('ASSIGNMENT_CSV', 'users.csv')
 selects_yml_path: str = os.getenv('SELECTS_YML', 'select.yml')
 descriptor_yml_path: str = os.getenv('DESCRIPTOR_YML', 'descriptor.yml')
 tmp_storage_path: str = os.getenv('TMP_STORAGE', 'files.json')

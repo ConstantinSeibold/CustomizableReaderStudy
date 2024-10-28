@@ -22,6 +22,21 @@ This project is a Streamlit-based web application designed for authenticated ann
   - `yaml`
   - `streamlit_authenticator`
 
+docker run -d -p 8501:8501 \
+  -v /Users/constantinseibold/workspace/rayvolve/Users.yml:/app/Users.yml \
+  -v /Users/constantinseibold/workspace/rayvolve/select.yml:/app/select.yml \
+  -v /Users/constantinseibold/Downloads/OneDrive_1_10-8-2024/:/app/study_samples \
+  -v /Users/constantinseibold/workspace/rayvolve/descriptor.yml:/app/descriptor.yml \
+  -v /Users/constantinseibold/workspace/rayvolve/results/:/app/results/ \
+  -e USERS_YML=/app/Users.yml \
+  -e SELECTS_YML=/app/select.yml \
+  -e DESCRIPTOR_YML=/app/descriptor.yml \
+  -e FILE_TYPE=dcm \
+  -e FILE_PATH=/app/study_samples \
+  -e STUDY_MODE=rayvolve \
+  -e RUN_MODE=debug \
+  cseibold/rayvolve:0.5
+
 ## Setup Instructions
 
 ### 1. Running Locally via Python

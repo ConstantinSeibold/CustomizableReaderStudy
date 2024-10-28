@@ -197,6 +197,7 @@ def main() -> None:
     selects_yml_path: str = os.getenv('SELECTS_YML', 'select.yml')
     descriptor_yml_path: str = os.getenv('DESCRIPTOR_YML', 'descriptor.yml')
     tmp_storage_path: str = os.getenv('TMP_STORAGE', 'files.json')
+    assignment_csv_path: str = os.getenv('ASSIGNMENT_CSV', 'users.csv')
     file_path: str = os.getenv('FILE_PATH', '')
     mode: str = os.getenv("STUDY_MODE", "original")
     run_mode: str = os.getenv("RUN_MODE", "original")
@@ -223,22 +224,29 @@ def main() -> None:
     name: str = st.session_state['name']
     username: str = st.session_state['username']
 
-    start_id: int = credentials["usernames"][name]['startid']
-    end_id: int = credentials["usernames"][name]['endid']
+    # import pdb;pdb.set_trace()
+    if config.get("case_assignment",False) and config.get("case_assignment",False).get("external_file", False):
+        elem = pd.read_csv(assignment_csv_path, delimiter=";")
+        ids:list[int] = [int(i[3:]) for i in elem[elem.reader == username].iloc[0].cases.split(",")]
+    else:
+        ids:list[int] = list(range(credentials["usernames"][name]['startid'], credentials["usernames"][name]['endid']))
 
     prefix: str = descriptor_yml["study_prefix"]
 
     # Get all files and filter based on user-specific start and end IDs
     ray_ids, all_files = get_all_files(file_path, prefix, file_type, mode, tmp_storage_path)
-    ray_ids = [index for index in ray_ids if start_id <= index <= end_id]
-
+    import pdb;pdb.set_trace()
+    ray_ids = [index for index in ray_ids if index in ids]
+    all_files = {index:all_files[index] for index in ray_ids}
+    # import pdb;pdb.set_trace()
+    
     # Map session states to IDs
     session_states: Dict[int, int] = {ray_id: i for i, ray_id in enumerate(ray_ids)}
     files: Dict[int, List[str]] = {index: all_files[index] for index in ray_ids}
 
     # Define the path to save the results CSV file
     csv_path: Path = Path(__file__).parent / 'results' / f'{username}-results.csv'
-
+    
     # Write results to CSV file
     write_csv(csv_path, selections, ray_ids)
 
