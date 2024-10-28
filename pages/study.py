@@ -235,7 +235,7 @@ def main() -> None:
 
     # Get all files and filter based on user-specific start and end IDs
     ray_ids, all_files = get_all_files(file_path, prefix, file_type, mode, tmp_storage_path)
-    import pdb;pdb.set_trace()
+    # import pdb;pdb.set_trace()
     ray_ids = [index for index in ray_ids if index in ids]
     all_files = {index:all_files[index] for index in ray_ids}
     # import pdb;pdb.set_trace()

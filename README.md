@@ -94,6 +94,7 @@ docker run -d -p 8501:8501 \
   -v /Users/constantinseibold/workspace/rayvolve/select.yml:/app/select.yml \
   -v /Users/constantinseibold/Downloads/OneDrive_1_10-8-2024/:/app/study_samples \
   -v /Users/constantinseibold/workspace/rayvolve/descriptor.yml:/app/descriptor.yml \
+  -v /Users/constantinseibold/workspace/rayvolve/users.csv:/app/users.csv \
   -e USERS_YML=/app/Users.yml \
   -e SELECTS_YML=/app/select.yml \
   -e DESCRIPTOR_YML=/app/descriptor.yml \
@@ -101,6 +102,7 @@ docker run -d -p 8501:8501 \
   -e FILE_PATH=/app/study_samples \
   -e STUDY_MODE=rayvolve \
   -e RUN_MODE=debug \
+  -e ASSIGNMENT_CSV=/Users/constantinseibold/workspace/rayvolve/users.csv \
   cseibold/rayvolve:amd64
 ```
 
