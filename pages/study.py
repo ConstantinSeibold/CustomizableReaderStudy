@@ -227,7 +227,10 @@ def main() -> None:
     # import pdb;pdb.set_trace()
     if config.get("case_assignment",False) and config.get("case_assignment",False).get("external_file", False):
         elem = pd.read_csv(assignment_csv_path, delimiter=";")
-        ids:list[int] = [int(i[3:]) for i in elem[elem.reader == username].iloc[0].cases.split(",")]
+        if len( elem[elem.reader == username])>0:
+            ids:list[int] = [int(i[3:]) for i in elem[elem.reader == username].iloc[0].cases.split(",")]
+        else:
+            ids = []
     else:
         ids:list[int] = list(range(credentials["usernames"][name]['startid'], credentials["usernames"][name]['endid']))
 

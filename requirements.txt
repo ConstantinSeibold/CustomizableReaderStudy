@@ -1,5 +1,5 @@
-streamlit
-pyyaml
-pydicom
-pandas
-streamlit_authenticator
+streamlit==1.37.1
+pyyaml==6.0.2
+pydicom==2.4.4
+pandas==2.2.2
+streamlit_authenticator==0.3.3

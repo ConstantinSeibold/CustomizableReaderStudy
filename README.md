@@ -66,6 +66,7 @@ Build the Docker image (optional):
 
 ```bash
 docker build -t rayvolve .
+# docker push cseibold/rayvolve:0.8 
 ```
 
 Run the Docker container via Dockerhub:
@@ -102,8 +103,8 @@ docker run -d -p 8501:8501 \
   -e FILE_PATH=/app/study_samples \
   -e STUDY_MODE=rayvolve \
   -e RUN_MODE=debug \
-  -e ASSIGNMENT_CSV=/Users/constantinseibold/workspace/rayvolve/users.csv \
-  cseibold/rayvolve:amd64
+  -e ASSIGNMENT_CSV=/app/users.csv \
+  cseibold/rayvolve:0.6
 ```
 
 ### Configuration Files
