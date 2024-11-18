@@ -9,7 +9,7 @@ COPY rayvolve_study_auth.py /app/
 COPY pages/ /app/pages
 COPY Dockerfile /app/
 
-RUN apt update && apt install -y libgl1-mesa-glx
+# RUN apt update && apt install -y libgl1-mesa-glx
 RUN python3 -m pip install --upgrade pip
 RUN pip install -r ./requirements.txt
 

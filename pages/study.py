@@ -3,7 +3,7 @@ from pathlib import Path
 from glob import glob
 import json
 from typing import List, Dict, Tuple
-
+from datetime import datetime, timedelta
 import streamlit as st
 import streamlit.components.v1 as components
 import pydicom
@@ -114,7 +114,7 @@ def write_csv(csv_path: Path, selects: dict, ids: list[int]) -> None:
     if not os.path.isfile(csv_path):
         os.makedirs(csv_path.parent, exist_ok=True)
         with open(str(csv_path), 'w+') as results_file:
-            header = 'ID, annotated,text_comment,'.replace(
+            header = 'ID, annotated,text_comment, time, '.replace(
                                    " ",""
                                ) + ",".join([
                                    ",".join([f"{elem},certainty_{elem}" for elem in selects[key]])
@@ -122,7 +122,7 @@ def write_csv(csv_path: Path, selects: dict, ids: list[int]) -> None:
                                    ]) + "\n"
             results_file.write(header)
 
-            row_template = "Nothing,"+",".join([
+            row_template = "Nothing, -1,"+",".join([
                                    ",".join(["False,-1" for elem in selects[key]])
                                    for key in selects.keys()
                                    ])
@@ -287,6 +287,8 @@ def main() -> None:
                 """,
                 height=0,
             )
+            # reset timer
+            st.session_state.current_time: float = datetime.now()
 
         def prev_file() -> None:
             if st.session_state.file_index > 0:
@@ -299,6 +301,8 @@ def main() -> None:
                 """,
                 height=0,
             )
+            # reset timer
+            st.session_state.current_time: float = datetime.now()
 
         # Display navigation buttons
         col1, col2, col3 = st.columns([1, 3, 1])
@@ -327,9 +331,16 @@ def main() -> None:
             info_md: str = descriptor_yml["task"]["task_caption"]
             st.markdown(info_md, unsafe_allow_html=True)
 
+        
+    
         # Check if the current file is annotated
         is_annotated: bool = df[df.ID == ray_ids[st.session_state.file_index]].annotated.iloc[0]
 
+        if "current_time" not in st.session_state:
+            # reset timer
+            st.session_state.current_time: float = datetime.now()
+        st.session_state.entry_time: float = float(df[df.ID == ray_ids[st.session_state.file_index]].time.iloc[0])
+    
         # Display the header with the case and current file index
         if run_mode == "debug":
             st.header(f'{descriptor_yml["case"]} {st.session_state.file_index + 1}/{len(files)} - {ray_ids[st.session_state.file_index]} - {"☑" if is_annotated else "☐"}')
@@ -377,8 +388,14 @@ def main() -> None:
         # Submit button for results
         enter_results = st.button(descriptor_yml["submit"])
         if enter_results:
+            
+            annotations[0]["time"] = float(st.session_state.entry_time + (datetime.now() - st.session_state.current_time).total_seconds())
             save_annotations(csv_path, annotations)
+            
             next_file()
+
+            # reset timer
+            st.session_state.current_time: float = datetime.now()
 
             # Reset checkboxes
             for subselect in selections[category]:
