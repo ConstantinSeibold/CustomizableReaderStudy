@@ -116,7 +116,7 @@ docker run -d -p 8501:8501 \
   -e FILE_PATH=/app/study_samples \
   -e STUDY_MODE=rayvolve \
   -e ASSIGNMENT_CSV=/app/users.csv \
-  cseibold/rayvolve:amd.0.9
+  cseibold/rayvolve:amd.0.10
 ```
 
 ## Configuration Files
