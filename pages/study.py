@@ -12,7 +12,7 @@ import pandas as pd
 from PIL import Image
 import yaml
 
-def apply_window_level(dicom_array: np.ndarray, window_width: float, window_level: float) -> np.ndarray:
+def apply_window_level(dicom_array: np.ndarray, window_width: float, window_level: float, invert=False) -> np.ndarray:
     """Applies window leveling to a DICOM image array.
 
     Args:
@@ -28,7 +28,10 @@ def apply_window_level(dicom_array: np.ndarray, window_width: float, window_leve
     
     # Clip and scale the pixel array to the [0, 255] range.
     dicom_array = np.clip(dicom_array, lower_bound, upper_bound)
-    dicom_array = ((dicom_array - lower_bound) / (upper_bound - lower_bound)) * 255.0
+    dicom_array = ((dicom_array - lower_bound) / (upper_bound - lower_bound))
+    if invert:
+        dicom_array = 1-dicom_array
+    dicom_array = dicom_array* 255.0
     return dicom_array.astype(np.uint8)
 
 def load_dicom_image(dicom_path: str) -> tuple[np.ndarray, float, float]:
@@ -152,21 +155,32 @@ def get_all_files(file_path: str, prefix: str, file_type: str, mode: str, tmp_st
         ray_files = glob(str(Path(file_path) / '*'))
 
         # Extract unique IDs (numbers after 'ray' prefix) from the filenames
-        ray_ids = sorted(list({
+        ray_ids = list({
             int(Path(file).stem.split("_")[0][3:])  # Extract the numeric part after 'ray'
             for file in ray_files
-        }))
+        })
         
         # Create a dictionary where each key is a ray_id and the value is a list of matching files
         all_files = {
             index: sum(
                 [
-                    glob(str(Path(file_path) / f"{prefix}{index:03}" / f'*_{st}.{file_type}'))
+                    glob(str(Path(file_path) / f"{prefix}{index:03}" / f'*_{st}.*'))
                     for st in mode.split("|")
                 ], []
             )
             for index in ray_ids
         }
+
+        
+        # Fix for Matthias
+        print(all_files)
+        if file_type!= "png":
+            all_files = {
+                index: [i for i in all_files[index] if ((file_type in i) and (not "rayvolve" in i)) or (("png" in i) and ("rayvolve" in i))]
+                for index in ray_ids
+            }
+
+        # import pdb;pdb.set_trace()
 
         with open(tmp_storage, 'w') as f:
             json.dump(all_files, f)
@@ -182,6 +196,35 @@ def get_all_files(file_path: str, prefix: str, file_type: str, mode: str, tmp_st
 
     # Return the list of ray_ids and the dictionary of all files
     return ray_ids, all_files
+
+def load_fields(category, selections, descriptor_yml, csv_path):
+    
+    current_annotations = pd.read_csv(csv_path)
+    
+    
+    conditions: Dict[str, bool] = {}
+    for subselect in selections[category]:
+        conditions[subselect] = st.checkbox(f"{subselect}", 
+                                            key=f"checkbox_{subselect}_{st.session_state.file_index}", 
+                                            value=current_annotations[subselect].iloc[st.session_state.file_index].item())
+        if conditions[subselect]:
+            conditions[f"certainty_{subselect}"] = st.slider(
+                descriptor_yml["certainty"]["certainty_caption"],
+                min_value=descriptor_yml["certainty"]["min_certainty"],
+                max_value=descriptor_yml["certainty"]["max_certainty"],
+                value=(descriptor_yml["certainty"]["min_certainty"] + descriptor_yml["certainty"]["max_certainty"]) // 2 \
+                    if current_annotations[f"certainty_{subselect}"].iloc[st.session_state.file_index].item() == -1 else current_annotations[f"certainty_{subselect}"].iloc[st.session_state.file_index].item(),
+                key=f"slider_{subselect}_{st.session_state.file_index}"
+            )
+
+    text_comment: str = st.text_input(descriptor_yml["comments"], 
+                                      value=current_annotations["text_comment"].iloc[st.session_state.file_index]
+                                      if current_annotations["text_comment"].iloc[st.session_state.file_index] == current_annotations["text_comment"].iloc[st.session_state.file_index]
+                                      else "",
+                                      key=f"comment_{st.session_state.file_index}")
+        
+        
+    return conditions, text_comment
 
 def main() -> None:
     """
@@ -224,7 +267,7 @@ def main() -> None:
     name: str = st.session_state['name']
     username: str = st.session_state['username']
 
-    # import pdb;pdb.set_trace()
+    
     if config.get("case_assignment",False) and config.get("case_assignment",False).get("external_file", False):
         elem = pd.read_csv(assignment_csv_path, delimiter=";")
         if len( elem[elem.reader == username])>0:
@@ -238,10 +281,10 @@ def main() -> None:
 
     # Get all files and filter based on user-specific start and end IDs
     ray_ids, all_files = get_all_files(file_path, prefix, file_type, mode, tmp_storage_path)
-    # import pdb;pdb.set_trace()
-    ray_ids = [index for index in ray_ids if index in ids]
+    
+    ray_ids = [index for index in ids if index in ray_ids]
     all_files = {index:all_files[index] for index in ray_ids}
-    # import pdb;pdb.set_trace()
+    
     
     # Map session states to IDs
     session_states: Dict[int, int] = {ray_id: i for i, ray_id in enumerate(ray_ids)}
@@ -350,32 +393,30 @@ def main() -> None:
         # Get and display the current file's images
         current_files: List[str] = files[ray_ids[st.session_state.file_index]]
         columns = st.columns(len(current_files))
-        load_image_file = load_dicom_image if file_type == "dcm" else load_image
+        load_image_file = load_dicom_image if (file_type == "dcm")  else load_image
 
         for i, file_path in enumerate(current_files):
             with columns[i]:
-                image_array, default_window_width, default_window_level = load_image_file(file_path)
+               
+                # fix for matthias
+                if "rayvolve" in file_path:
+                    image_array, default_window_width, default_window_level = load_image(file_path)
+                else:
+                    image_array, default_window_width, default_window_level = load_image_file(file_path)
+                
+                if f"inversion_{i}_{st.session_state.file_index}" not in st.session_state.keys():
+                    st.session_state[f"inversion_{i}_{st.session_state.file_index}"] = False
+                if st.button("Invert Image", key=f"button_inversion_{i}_{st.session_state.file_index}"):
+                    st.session_state[f"inversion_{i}_{st.session_state.file_index}"] = not st.session_state[f"inversion_{i}_{st.session_state.file_index}"]
                 window_width = st.slider(f"Window Width_{i}", min_value=1, max_value=int(image_array.max()), value=int(default_window_width))
                 window_level = st.slider(f"Window Level_{i}", min_value=int(image_array.min()), max_value=int(image_array.max()), value=int(default_window_level))
-                image_array = apply_window_level(image_array, window_width, window_level)
+                image_array = apply_window_level(image_array, window_width, window_level, st.session_state[f"inversion_{i}_{st.session_state.file_index}"])
                 image = Image.fromarray(image_array)
                 st.image(image, use_column_width=True)
 
         # Handle annotations
         category = Path(current_files[0]).stem.split("_")[1]
-        conditions: Dict[str, bool] = {}
-        for subselect in selections[category]:
-            conditions[subselect] = st.checkbox(f"{subselect}", key=f"checkbox_{subselect}", value=False)
-            if conditions[subselect]:
-                conditions[f"certainty_{subselect}"] = st.slider(
-                    descriptor_yml["certainty"]["certainty_caption"],
-                    min_value=descriptor_yml["certainty"]["min_certainty"],
-                    max_value=descriptor_yml["certainty"]["max_certainty"],
-                    value=(descriptor_yml["certainty"]["min_certainty"] + descriptor_yml["certainty"]["max_certainty"]) // 2,
-                    key=f"slider_{subselect}"
-                )
-
-        text_comment: str = st.text_input(descriptor_yml["comments"])
+        conditions, text_comment = load_fields(category, selections, descriptor_yml, csv_path)
 
         # Store annotations
         annotations: List[Dict] = [{
@@ -398,9 +439,9 @@ def main() -> None:
             st.session_state.current_time: float = datetime.now()
 
             # Reset checkboxes
-            for subselect in selections[category]:
-                del st.session_state[f"checkbox_{subselect}"]
-                st.session_state[f"checkbox_{subselect}"] = False
+            # for subselect in selections[category]:
+            #     del st.session_state[f"checkbox_{subselect}"]
+            #     st.session_state[f"checkbox_{subselect}"] = False
 
             st.rerun()
 

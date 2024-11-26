@@ -1,5 +1,10 @@
 *.dcm
 *.png
-Users.yml
-rayvolve/
+*.csv
+*.yml
+*.pyc
+*.json
+__pycache__
 results/
+rayvolve_study_samples/
+.DS_STORE
