@@ -16,11 +16,11 @@ from hash_password import hide_users  # Assuming you have this
 st.set_page_config(layout="wide")
 
 # Environment variable fallbacks
-users_yml_path: str = os.getenv('USERS_YML', 'Users.yml')
-assignment_csv_path: str = os.getenv('ASSIGNMENT_CSV', 'users.csv')
-selects_yml_path: str = os.getenv('SELECTS_YML', 'select.yml')
-descriptor_yml_path: str = os.getenv('DESCRIPTOR_YML', 'descriptor.yml')
-tmp_storage_path: str = os.getenv('TMP_STORAGE', 'files.json')
+users_yml_path: str = os.getenv("USERS_YML", "Users.yml")
+assignment_csv_path: str = os.getenv("ASSIGNMENT_CSV", "users.csv")
+selects_yml_path: str = os.getenv("SELECTS_YML", "select.yml")
+descriptor_yml_path: str = os.getenv("DESCRIPTOR_YML", "descriptor.yml")
+tmp_storage_path: str = os.getenv("TMP_STORAGE", "files.json")
 
 
 # Function for authenticating the user
@@ -36,32 +36,35 @@ def authenticate_user() -> Tuple[Dict, stauth.Authenticate]:
     hide_users()
 
     # Load the users.yml configuration
-    with open(users_yml_path, 'r') as file:
+    with open(users_yml_path, "r") as file:
         config: Dict = yaml.safe_load(file)
 
     # Load the descriptor.yml configuration
-    with open(descriptor_yml_path, 'r') as file:
+    with open(descriptor_yml_path, "r") as file:
         descriptor_yml: Dict = yaml.safe_load(file)
 
     # Extract credentials and cookie settings
-    credentials: Dict = config['credentials']
+    credentials: Dict = config["credentials"]
 
     # Initialize the authenticator with credentials and cookie configuration
     authenticator: stauth.Authenticate = stauth.Authenticate(
         credentials,
-        config['cookie']['name'],
-        config['cookie']['key'],
-        config['cookie']['expiry_days'],
+        config["cookie"]["name"],
+        config["cookie"]["key"],
+        config["cookie"]["expiry_days"],
     )
 
     # Display the login form with custom field labels from the descriptor file
     try:
-        authenticator.login('main', fields={
-            'Form name': descriptor_yml["login"]["study_name"],
-            'Username': descriptor_yml["login"]["username"],
-            'Password': descriptor_yml["login"]["password"],
-            'Login': descriptor_yml["login"]["login"]
-        })
+        authenticator.login(
+            "main",
+            fields={
+                "Form name": descriptor_yml["login"]["study_name"],
+                "Username": descriptor_yml["login"]["username"],
+                "Password": descriptor_yml["login"]["password"],
+                "Login": descriptor_yml["login"]["login"],
+            },
+        )
     except Exception as e:
         st.error(f"Login error: {e}")
 
@@ -76,11 +79,11 @@ def main() -> None:
     descriptor_yml, authenticator = authenticate_user()
 
     # Retrieve the authentication status from session state
-    authentication_status = st.session_state.get('authentication_status')
+    authentication_status = st.session_state.get("authentication_status")
 
     if authentication_status:
         # Logout button in the sidebar
-        authenticator.logout(descriptor_yml["login"]["logout"], 'sidebar')
+        authenticator.logout(descriptor_yml["login"]["logout"], "sidebar")
         st.session_state["authenticator"] = authenticator
         # Redirect to study page
         st.switch_page("pages/study.py")
