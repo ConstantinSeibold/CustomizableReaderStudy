@@ -125,7 +125,7 @@ def write_csv(csv_path: Path, selects: dict, ids: list[int]) -> None:
                                    ]) + "\n"
             results_file.write(header)
 
-            row_template = "Nothing, -1,"+",".join([
+            row_template = ", -1,"+",".join([
                                    ",".join(["False,-1" for elem in selects[key]])
                                    for key in selects.keys()
                                    ])
